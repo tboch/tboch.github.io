@@ -116,23 +116,37 @@ aladin.on('objectClicked', function (object) {
     Tone.Transport.start('+0.15');
     var star = object.data;
     var isGaiaVariable = false;
+    var isEROS2Star = false;
     if (star.hasOwnProperty('source_id')) {
         isGaiaVariable = true;
-
+    }
+    if (star.hasOwnProperty('EROS2')) {
+        isEROS2Star = true;
     }
 
-    if (isGaiaVariable) {
-        var sourceId = star.source_id;
-        var period = star.pf;
+    if (isGaiaVariable || isEROS2Star) {
+        var sourceId, period;
+        var url;
+        if (isGaiaVariable) {
+            sourceId = star.source_id;
+            period = star.pf;
+            url = 'https://cds.unistra.fr/~boch/adass2018-hackathon/data/' + sourceId + '.json';
+        }
+        else if (isEROS2Star) {
+            sourceId = star.EROS2;
+            period = star.Per;
+            url = 'https://cds.unistra.fr/~boch/adass2018-hackathon/data/EROS2-lm0467m6802.json';
+        }
 
         var xhr = new XMLHttpRequest();
 
-        var url = 'https://cds.unistra.fr/~boch/adass2018-hackathon/data/' + sourceId + '.json';
+        // 'EROS2-lm0467m6802.json'
 
         xhr.open('GET', url, true);
         xhr.onload = function () {
             if (xhr.status === 200) {
                 var data = JSON.parse(xhr.responseText);
+                console.log(data);
 
                 var phase_estimate = data.phase_estimate.slice(0, 48);
                 var phase_estimate_2P = phase_estimate.concat(phase_estimate.map(function (x) { return 1 + x; }));
@@ -144,22 +158,24 @@ aladin.on('objectClicked', function (object) {
                 var phase_2P = data.phase.concat(data.phase.map(function (x) { return 1 + x; }));
 
                 var synth;
+		var vel; 
                 if (globalInstId == 1) {
-                    synth = new Tone.MembraneSynth({
-                        "pitchDecay": 0.008,
-                        "octaves": 2,
-                        "envelope": {
-                            "attack": 0.01,
-                            "decay": 0.5,
-                            "sustain": 0
-                        }
-                    }).toMaster();
+		    synth = new Tone.MembraneSynth({
+			"pitchDecay" : 0.008,
+			"octaves" : 2,
+			"envelope" : {
+				"attack" : 0.01,
+				"decay" : 0.5,
+				"sustain" : 0
+			}
+		    });
                     // Connect lowpass filter to the kick
                     synth.connect(new Tone.Filter(500));
                     var freeverb = new Tone.Freeverb().toMaster();
                     freeverb.dampening.value = 100;
                     synth.connect(freeverb);
                     synth.toMaster();
+                    vel = velocities[Math.floor(Math.random() * velocities.length)];
                 } else if (globalInstId == 0) {
                     synth = new Tone.FMSynth({
                         "harmonicity": 1,
@@ -188,20 +204,27 @@ aladin.on('objectClicked', function (object) {
                             },
                         }
                     }).toMaster();
-                } else if (globalInstId == 2) {
-                    synth = new Tone.MembraneSynth({
-                        "pitchDecay": 0.01,
-                        "octaves": 6,
-                        "oscillator": {
-                            "type": "square4"
-                        },
-                        "envelope": {
-                            "attack": 0.001,
-                            "decay": 0.2,
-                            "sustain": 0
-                        }
-                    }).toMaster();
-                }
+                    vel = velocities[Math.floor(Math.random() * velocities.length)];
+		} else if(globalInstId == 2) {
+			synth = new Tone.MembraneSynth({
+				"volume": "+10",
+				"pitchDecay" : 0.008,
+				"octaves" : 2,
+				"envelope" : {
+					"attack" : 0.01,
+					"decay" : 1,
+					"sustain" : 0,
+				}
+		    	});
+                    	// Connect lowpass filter to the kick
+
+                    	vel = 12;
+                    // Connect lowpass filter to the kick
+                    var freeverb = new Tone.Freeverb().toMaster();
+                    freeverb.dampening.value = 100;
+                    synth.connect(freeverb);
+                    synth.toMaster();
+		}
 
                 var newStar = {
                     params: {
@@ -219,7 +242,7 @@ aladin.on('objectClicked', function (object) {
                     synth: synth,
                     type: typeOfInsts[globalInstId],
                     instId: globalInstId,
-                    vel: velocities[Math.floor(Math.random() * velocities.length)],
+                    vel: vel,
                 };
                 object.starRef = newStar;
                 newStar.ref = object;
@@ -231,7 +254,8 @@ aladin.on('objectClicked', function (object) {
                 var ulElt = document.getElementById('starsList');
                 var liElt = document.createElement('li');
                 var color = colors[globalInstId];
-                liElt.innerHTML = "<p style='color: " + color + ";display: inline-block;margin: 0'>" + typeOfInsts[globalInstId] + "</>" + ' for source: ' + object.data.source_id;
+                var sourceName = object.data.EROS2 !== undefined ? 'EROS2 ' + object.data.EROS2 : 'Gaia DR2 ' + object.data.source_id;
+                    liElt.innerHTML = "<p style='color: " + color + ";display: inline-block;margin: 0'>" + typeOfInsts[globalInstId] + "</>" + ' for source: ' + sourceName;
 
                 ulElt.appendChild(liElt);
 
@@ -272,10 +296,23 @@ var getShape = function (diam, r, g, b, opacity) {
 var starDrawFunction = function (source, canvasCtx, viewParams) {
     if (source.starRef) {
         drawAnimatedStar(source, canvasCtx, source.starRef.lcIndex);
+
+        var sourceName = source.data.EROS2 !== undefined ? 'EROS2 ' + source.data.EROS2 : 'Gaia DR2 ' + source.data.source_id;
+        canvasCtx.font = '15px Arial'
+        canvasCtx.fillStyle = '#eee';
+        canvasCtx.fillText(sourceName, source.x + 30, source.y - 14);
         return;
     }
     var diam = 14;
-    canvasCtx.drawImage(getShape(diam, 230, 20, 20, 0.7), source.x - diam / 2., source.y - diam / 2.);
+    if (source.data.EROS2 !== undefined) {
+        diam += 4;
+        canvasCtx.drawImage(getShape(diam, 3, 255, 255, 0.9), source.x - diam / 2., source.y - diam / 2.);
+
+    }
+    else {
+
+        canvasCtx.drawImage(getShape(diam, 230, 20, 20, 0.7), source.x - diam / 2., source.y - diam / 2.);
+    }
 };
 
 var drawAnimatedStar = function (source, canvasCtx, idx) { // progression between 0 and 1
@@ -290,12 +327,17 @@ var pulsarDrawFunction = function (source, canvasCtx, viewParams) {
 };
 // load catalogue with positions of Gaia stars for which we have light curves
 // draw function is too slow for that many sources :(
-aladin.addCatalog(A.catalogFromURL('https://cds.unistra.fr/~boch/adass2018-hackathon/gaia-variable-sample.vot', { shape: starDrawFunction, onClick: 'showTable' }));
-aladin.addCatalog(A.catalogFromVizieR('J/ApJ/804/23/pulsars', '0 +0', 180, { shape: pulsarDrawFunction, onClick: 'showTable', name: 'Pulsars' }));
+aladin.addCatalog(A.catalogFromURL('https://cds.unistra.fr/~boch/adass2018-hackathon/gaia-variable-sample.vot', { color: 'red', shape: starDrawFunction, name: 'Gaia cepheids', onClick: 'showTable' }));
+//aladin.addCatalog(A.catalogFromVizieR('J/ApJ/804/23/pulsars', '0 +0', 180, { shape: pulsarDrawFunction, onClick: 'showTable', name: 'Pulsars' }));
+var ebCatalog = aladin.addCatalog(A.catalogFromVizieR('J/MNRAS/443/432/HEBs', '82.5825300 -65.94423', 0.01, { color: 'cyan', shape: starDrawFunction, onClick: 'showTable', name: 'EB' }));
 
 var playChords = false;
 document.getElementById('chordsControl').addEventListener('change', function (e) {
     playChords = e.target.checked;
+});
+
+document.getElementById('volume').addEventListener('change', function (e) {
+    Tone.Master.volume.value = this.value;
 });
 
 var t = 0;
@@ -349,8 +391,8 @@ var loop = new Tone.Loop(function (time) {
             }
         } else if (currentStar.type == 'kick') {
             //triggered at different notes
-            if ((t + 4) % currentStar.vel == 0) {
-                currentStar.synth.triggerAttack(note, '48n');
+            if (t % currentStar.vel == 0) {
+                currentStar.synth.triggerAttackRelease(note, '48n');
             }
         }
     }
