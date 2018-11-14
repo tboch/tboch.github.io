@@ -127,7 +127,7 @@ aladin.on('objectClicked', function (object) {
 
         var xhr = new XMLHttpRequest();
 
-        var url = 'http://cds.unistra.fr/~boch/adass2018-hackathon/data/' + sourceId + '.json';
+        var url = 'https://cds.unistra.fr/~boch/adass2018-hackathon/data/' + sourceId + '.json';
 
         xhr.open('GET', url, true);
         xhr.onload = function () {
@@ -290,7 +290,7 @@ var pulsarDrawFunction = function (source, canvasCtx, viewParams) {
 };
 // load catalogue with positions of Gaia stars for which we have light curves
 // draw function is too slow for that many sources :(
-aladin.addCatalog(A.catalogFromURL('http://cds.unistra.fr/~boch/adass2018-hackathon/gaia-variable-sample.vot', { shape: starDrawFunction, onClick: 'showTable' }));
+aladin.addCatalog(A.catalogFromURL('https://cds.unistra.fr/~boch/adass2018-hackathon/gaia-variable-sample.vot', { shape: starDrawFunction, onClick: 'showTable' }));
 aladin.addCatalog(A.catalogFromVizieR('J/ApJ/804/23/pulsars', '0 +0', 180, { shape: pulsarDrawFunction, onClick: 'showTable', name: 'Pulsars' }));
 
 var playChords = false;
