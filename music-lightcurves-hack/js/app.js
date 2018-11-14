@@ -1,121 +1,362 @@
-Tone.Transport.bpm.value = 100;
-// http://tonejs.org/docs/#DuoSynth
-var synth = new Tone.FMSynth();
-//var synth = new Tone.PolySynth(6, Tone.Synth).toMaster();
-synth.set({
-    'envelope':
-    {
-        attack: 0.005,
-        decay: 0.3,
-        sustain: 0.3,
-        release: 0.1
-    }
+// load all frames to animate stars
+var starAnimationFrames = [];
+for (var k = 0; k < 30; k++) {
+    var image = new Image();
+    image.idx = k;
+    image.onload = function () {
+        starAnimationFrames[this.idx] = this;
+    };
+    image.src = 'pics/star-frames/f' + k + '.png';
+}
+
+var notes = ['C3', 'D#3', 'F3', 'G#3', 'A#3', 'C4', 'D#4', 'F4', 'G#4', 'A#4', 'C5', 'D#5'];
+//notes = ['A2', 'C3', 'D3', 'E3', 'G3', 'A3', 'C4', 'D4', 'E4', 'G4', 'A4']; // minor pentatonic
+//notes = ['C3', 'C3#', 'D3', 'D3#', 'E3', 'F3', 'F3#', 'G3', 'G3#', 'A3', 'A3#', 'B3', 'C4', 'C4#', 'D4', 'D4#', 'E4', 'F4', 'F4#', 'G4', 'G4#', 'A4', 'A4#', 'B4'];
+notes = ['C3', 'D3', 'E3', 'G3', 'A3', 'C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5'];
+var chordsArray = [['F3', 'A3', 'D4'], ['B3', 'D4', 'G4'], ['C3', 'E3', 'A3'], ['A3', 'C4', 'F4']]; // veridis quo
+chordsArray = [['G3', 'C4', 'E4'], ['A3', 'C4', 'E4'], ['F3', 'A3', 'C4', 'E4'], ['G3', 'A3', 'C4', 'F4']]; // 
+//chordsArray = [['A3', 'C3', 'E4'], ['G3', 'B3', 'D4'], ['F3', 'A3', 'C4'], ['D3', 'F3', 'A3']];  // kavinsky
+var piano = new Tone.PolySynth(3, Tone.Synth, {
+    "volume": -10,
+    "spread": 30,
+    "envelope": {
+        "attack": 0.01,
+        "decay": 0.1,
+        "sustain": 0.5,
+        "release": 0.4,
+        "attackCurve": "exponential"
+    },
+});
+piano.toMaster();
+
+// Tone JS
+Tone.Transport.bpm.value = 300;
+
+var velocities = [8, 8, 8];
+
+// number of instruments and their colors
+var numInst = 3;
+var colors = ['green', 'red', 'purple'];
+
+// Describes the list of instruments which will be played
+// In order :
+// - melody synth
+// - kick
+// - add here more instruments
+// Cycles when all instruments have already been added one time
+var globalInstId = 0;
+var typeOfInsts = ['melody', 'conga', 'kick'];
+Plotly.newPlot('lightcurve', [], {
+    yaxis: { autorange: "reversed", title: 'G mag' },
+    xaxis: { title: 'phase' },
+
+    showlegend: false,
 });
 
+var startPlayingStar = function (star) {
+    if (!star || !star.params) {
+        return;
+    }
+    var params = star.params;
+    var color = colors[star.instId];
+    var d = [
+        {
+            x: params.phase_estimate_2P,
+            y: params.mag_estimate_2P,
+            mode: 'markers',
+            marker: { color: 'pink', size: 4 },
+            name: star.id,
+        },
+        {
+            x: params.phase_2P,
+            y: params.mag_2P,
+            mode: 'markers',
+            marker: { color: color, size: 8 }
+        },
+        {
+            x: [params.phase_estimate_2P[star.lcIndex]],
+            y: [params.mag_estimate_2P[star.lcIndex]],
+            mode: 'markers',
+            marker: { color: color, size: 8 }
+        },
+    ];
+    Plotly.addTraces('lightcurve', d);
+};
 
-var gain = new Tone.Gain(0.5);
-synth.connect(gain);
-gain.toMaster();
+// initialize Aladin Lite
+var aladin = A.aladin('#aladin-lite-div', { target: 'sgr a*', fov: 10, cooFrame: 'galactic', survey: 'P/DSS2/red' });
 
-function playSoundForStars(stars) {
-    if (!stars || stars.length == 0) {
+var selectedStars = [];
+// Set how we react when an object is clicked
+aladin.on('objectClicked', function (object) {
+    console.log('click', object);
+    if (object == null) {
+        Tone.Transport.stop();
+        for (var k = 0; k < selectedStars.length; k++) {
+            var s = selectedStars[k].ref;
+            s.starRef = undefined;
+            s.catalog.reportChange();
+        }
+        selectedStars = [];
+        Plotly.newPlot('lightcurve', [], {
+            yaxis: { autorange: "reversed", title: 'G mag' },
+            xaxis: { title: 'phase' },
+
+            showlegend: false,
+        });
+        globalInstId = 0;
+        var ulElt = document.getElementById('starsList');
+        while (ulElt.hasChildNodes()) {
+            ulElt.removeChild(ulElt.lastChild);
+        }
+        document.getElementById('textListStars').innerText = "No stars playing";
         return;
     }
 
+    Tone.Transport.start('+0.15');
+    var star = object.data;
+    var isGaiaVariable = false;
+    if (star.hasOwnProperty('source_id')) {
+        isGaiaVariable = true;
 
-
-
-    var tones = ['C3', 'D#3', 'F3', 'G3', 'G#3', 'A#3', 'C4', 'D#4', 'F4', 'G4', 'G#4', 'A#4', 'C5', 'D#5'];
-
-    var mags = [];
-    for (var k = 0; k < stars.length; k++) {
-        var star = stars[k];
-        mags = mags.concat(star.mag_estimate);
     }
 
-    var phases = stars[0].phase_estimate;
+    if (isGaiaVariable) {
+        var sourceId = star.source_id;
+        var period = star.pf;
 
-    var minMag = Math.min(...mags);
-    var maxMag = Math.max(...mags);
-    var sequenceDuration = 20;
-    var durationSum = 0;
-    var phaseElt = document.getElementById('phase');
-    var counter = 0;
-    var startingPhases = phases;
-    for (var i = 0; i < phases.length - 1; i++) {
-        var startingPhase = startingPhases[i];
+        var xhr = new XMLHttpRequest();
 
-        var duration;
-        duration = startingPhases[i + 1] - startingPhase;
-        duration *= sequenceDuration;
+        var url = 'http://cds.unistra.fr/~boch/adass2018-hackathon/data/' + sourceId + '.json';
 
-        var notesToPlay = [];
-        for (var k = 0; k < stars.length; k++) {
-            var star = stars[k];
-            var noteIdx = Math.floor((tones.length - 1) * (star.mag_estimate[i] - minMag) / (maxMag - minMag));
-            var note = tones[tones.length - 1 - noteIdx];
-            notesToPlay.push(note);
+        xhr.open('GET', url, true);
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                var data = JSON.parse(xhr.responseText);
+
+                var phase_estimate = data.phase_estimate.slice(0, 48);
+                var phase_estimate_2P = phase_estimate.concat(phase_estimate.map(function (x) { return 1 + x; }));
+
+                var mag_estimate = data.mag_estimate.slice(0, 48);
+                var mag_estimate_2P = mag_estimate.concat(mag_estimate);
+
+                var mag_2P = data.mag.concat(data.mag);
+                var phase_2P = data.phase.concat(data.phase.map(function (x) { return 1 + x; }));
+
+                var synth;
+                if (globalInstId == 1) {
+                    synth = new Tone.MembraneSynth({
+                        "pitchDecay": 0.008,
+                        "octaves": 2,
+                        "envelope": {
+                            "attack": 0.01,
+                            "decay": 0.5,
+                            "sustain": 0
+                        }
+                    }).toMaster();
+                    // Connect lowpass filter to the kick
+                    synth.connect(new Tone.Filter(500));
+                    var freeverb = new Tone.Freeverb().toMaster();
+                    freeverb.dampening.value = 100;
+                    synth.connect(freeverb);
+                    synth.toMaster();
+                } else if (globalInstId == 0) {
+                    synth = new Tone.FMSynth({
+                        "harmonicity": 1,
+                        "volume": -5,
+                        "modulationIndex": 3.5,
+                        "carrier": {
+                            "oscillator": {
+                                "instId": "custom",
+                                "partials": [0, 1, 0, 2]
+                            },
+                            "envelope": {
+                                "attack": 0.08,
+                                "decay": 0.3,
+                                "sustain": 0,
+                            },
+                        },
+                        "modulator": {
+                            "oscillator": {
+                                "instId": "square"
+                            },
+                            "envelope": {
+                                "attack": 0.1,
+                                "decay": 0.2,
+                                "sustain": 0.3,
+                                "release": 0.01
+                            },
+                        }
+                    }).toMaster();
+                } else if (globalInstId == 2) {
+                    synth = new Tone.MembraneSynth({
+                        "pitchDecay": 0.01,
+                        "octaves": 6,
+                        "oscillator": {
+                            "type": "square4"
+                        },
+                        "envelope": {
+                            "attack": 0.001,
+                            "decay": 0.2,
+                            "sustain": 0
+                        }
+                    }).toMaster();
+                }
+
+                var newStar = {
+                    params: {
+                        mag_2P: mag_2P,
+                        phase_2P: phase_2P,
+                        mag_estimate_2P: mag_estimate_2P,
+                        phase_estimate_2P: phase_estimate_2P,
+                        // minMag: 15,
+                        // maxMag: 20
+                        minMag: Math.min(...mag_estimate),
+                        maxMag: Math.max(...mag_estimate)
+                    },
+                    id: sourceId,
+                    lcIndex: 0,
+                    synth: synth,
+                    type: typeOfInsts[globalInstId],
+                    instId: globalInstId,
+                    vel: velocities[Math.floor(Math.random() * velocities.length)],
+                };
+                object.starRef = newStar;
+                newStar.ref = object;
+                startPlayingStar(newStar);
+                selectedStars.push(newStar);
+                //console.log('star:', newStar);
+
+                // Add to the DOM
+                var ulElt = document.getElementById('starsList');
+                var liElt = document.createElement('li');
+                var color = colors[globalInstId];
+                liElt.innerHTML = "<p style='color: " + color + ";display: inline-block;margin: 0'>" + typeOfInsts[globalInstId] + "</>" + ' for source: ' + object.data.source_id;
+
+                ulElt.appendChild(liElt);
+
+                document.getElementById('textListStars').innerText = "List of stars playing:";
+                globalInstId++;
+                globalInstId = globalInstId % numInst;
+            }
+            else if (xhr.status !== 200) {
+                alert('Request failed.  Returned status of ' + xhr.status);
+            }
         }
-        console.log('We re playing:', notesToPlay, duration, durationSum);
-        synth.triggerAttackRelease(notesToPlay[0], duration / 2, durationSum + Tone.Transport.toSeconds(Tone.Transport.ticks + "i"));
-
-
-        /*
-                Tone.Transport.schedule(function(time){
-                console.log('duration:', duration)
-                console.log('trigger', time);
-                console.log(time/sequenceDuration);
-        
-                phaseElt.innerHTML = startingPhases[counter];
-                counter++;
-          }, durationSum);
-          */
-
-        durationSum += duration;
+        xhr.send();
     }
-    console.log("sum, ", durationSum)
-    Tone.Transport.start()
-}
+});
+
+var shapesCache = {};
+var getShape = function (diam, r, g, b, opacity) {
+    var key = diam + '-' + r + '-' + g + '-' + b + '-' + opacity;
+
+    if (shapesCache[key] === undefined) {
+        var c = document.createElement('canvas');
+        c.width = c.height = diam;
+        var ctx = c.getContext('2d');
+        ctx.beginPath();
+        var color = opacity ? 'rgb(' + r + ',' + g + ',' + b + ',' + opacity + ')' : 'rgb(' + r + ',' + g + ',' + b + ')';
+        ctx.fillStyle = color;
+        ctx.arc(diam / 2., diam / 2., diam / 2., 0, 2 * Math.PI, true);
+        ctx.fill();
+
+        shapesCache[key] = c;
+    }
+
+    return shapesCache[key];
+};
 
 
-// END
+// define custom draw function
+var starDrawFunction = function (source, canvasCtx, viewParams) {
+    if (source.starRef) {
+        drawAnimatedStar(source, canvasCtx, source.starRef.lcIndex);
+        return;
+    }
+    var diam = 14;
+    canvasCtx.drawImage(getShape(diam, 230, 20, 20, 0.7), source.x - diam / 2., source.y - diam / 2.);
+};
 
+var drawAnimatedStar = function (source, canvasCtx, idx) { // progression between 0 and 1
+    var img = starAnimationFrames[idx % starAnimationFrames.length];
+    canvasCtx.drawImage(img, source.x - img.width / 2, source.y - img.height / 2);
 
-var aladin = A.aladin('#aladin-lite-div', { target: 'sgr a*', fov: 10, cooFrame: 'galactic' });
+};
 
+var pulsarDrawFunction = function (source, canvasCtx, viewParams) {
+    var diam = 14;
+    canvasCtx.drawImage(getShape(diam, 56, 124, 234), source.x - diam / 2., source.y - diam / 2.);
+};
+// load catalogue with positions of Gaia stars for which we have light curves
+// draw function is too slow for that many sources :(
+aladin.addCatalog(A.catalogFromURL('http://cds.unistra.fr/~boch/adass2018-hackathon/gaia-variable-sample.vot', { shape: starDrawFunction, onClick: 'showTable' }));
+aladin.addCatalog(A.catalogFromVizieR('J/ApJ/804/23/pulsars', '0 +0', 180, { shape: pulsarDrawFunction, onClick: 'showTable', name: 'Pulsars' }));
 
-aladin.on('objectClicked', function (object) {
-    var sourceId = object.data.source_id;
-    var period = object.data.pf;
-    var xhr = new XMLHttpRequest();
-    /*
-    var query = 'SELECT g_transit_time,g_transit_mag FROM "I/345/transits" where source_id=' + source;
-    var url = 'http://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync?'
-    url += '&request=doQuery&lang=adql&format=json&phase=run';
-    url += '&query=' + encodeURIComponent(query);
-    */
-    console.log(period);
-    var url = 'http://cds.unistra.fr/~boch/adass2018-hackathon/data/' + sourceId + '.json';
-    window.open('http://cdsxmatch.u-strasbg.fr/gadgets/ifr?url=http://cdsxmatch.u-strasbg.fr/widgets/graphs_VizieR.xml&dataset_url_1=http%3A%2F%2Fcdsarc.u-strasbg.fr%2Fviz-bin%2Fvizgraph%3F-s%3DI%2F345%26-i%3D.graph_sql_lc%26Star%3D' + sourceId + '%26Per%3D' + period + '%26--output%3Dvotable&option_graph_title=I%2F345%20Light%20curves%20of%20source%20' + sourceId + '&option_axis_x_period=' + period + '&option_axis_x_min=0&option_axis_x_max=1&option_axis_x_label=&option_axis_y_min=11&option_axis_y_max=17&option_axis_y_label=&option_dataset_equation_-1=x&option_dataset_color_-1=blue&option_dataset_size_lines_-1=1&option_dataset_symbol_-1=circle&option_dataset_size_points_-1=1&option_dataset_x_axis_0=&x_err_0=none&option_dataset_y_axis_0=Gmag%20%5Bmag%5D&y_err_0=err&option_dataset_color_0=%2333CC00&option_dataset_size_lines_0=1&option_dataset_symbol_0=circle&option_dataset_size_points_0=1&option_dataset_x_axis_1=&x_err_1=none&option_dataset_y_axis_1=BPmag%20%5Bmag%5D&y_err_1=err&option_dataset_color_1=%230066FF&option_dataset_size_lines_1=1&option_dataset_symbol_1=circle&option_dataset_size_points_1=1&option_dataset_x_axis_2=&x_err_2=none&option_dataset_y_axis_2=RPmag%20%5Bmag%5D&y_err_2=err&option_dataset_color_2=%23D80000&option_dataset_size_lines_2=1&option_dataset_symbol_2=circle&option_dataset_size_points_2=1&option_axis_x_log=false&option_axis_x_reverse=false&option_axis_x_phase=true&option_axis_y_log=false&option_axis_y_reverse=true&option_dataset_serie_-1=false&option_dataset_lines_-1=true&option_dataset_points_-1=false&option_dataset_serie_0=true&option_dataset_lines_0=false&option_dataset_points_0=true&option_dataset_serie_1=true&option_dataset_lines_1=false&option_dataset_points_1=true&option_dataset_serie_2=true&option_dataset_lines_2=false&option_dataset_points_2=true', 'lightcurve', "height=800,width=700");
+var playChords = false;
+document.getElementById('chordsControl').addEventListener('change', function (e) {
+    playChords = e.target.checked;
+});
 
+var t = 0;
+var loop = new Tone.Loop(function (time) {
+    for (var k = 0; k < selectedStars.length; k++) {
+        var currentStar = selectedStars[k];
 
-    xhr.open('GET', url, true);
+        currentStar.lcIndex++;
+        currentStar.lcIndex = currentStar.lcIndex % 96;
+        var idTrace = k * 3 + 2;
 
-    xhr.onload = function () {
-        if (xhr.status === 200) {
-            console.log(xhr.responseText);
-            var starParam = JSON.parse(xhr.responseText);
-            playSoundForStars([starParam]);
-            console.log(starParam);
+        var color = colors[currentStar.instId];
+        Plotly.animate('lightcurve', {
+            data: [{
+                x: [currentStar.params.phase_estimate_2P[currentStar.lcIndex]],
+                y: [currentStar.params.mag_estimate_2P[currentStar.lcIndex]],
+                mode: 'markers',
+                marker: { color: color, size: 13 }
+            }],
+            traces: [idTrace]
+        },
+            {
+                transition: {
+                    duration: 0,
+                },
+                frame: {
+                    duration: 0,
+                    redraw: false,
+                }
+            });
+    }
+    for (var k = 0; k < selectedStars.length; k++) {
+        var currentStar = selectedStars[k];
+
+        var noteIdx = Math.floor((notes.length - 1) * (currentStar.params.mag_estimate_2P[currentStar.lcIndex] - currentStar.params.minMag) / (currentStar.params.maxMag - currentStar.params.minMag));
+        var note = notes[notes.length - 1 - noteIdx];
+        if (currentStar.type == 'melody') {
+            currentStar.ref.catalog.reportChange();
+            var mesureIdx = parseInt(Tone.Transport.position.split(':')[0]) % 16;
+            mesureIdx = Math.floor(mesureIdx / 4);
+            // play chords
+            if (playChords && currentStar.lcIndex % 48 == 0) {
+                piano.triggerAttackRelease(chordsArray[mesureIdx], '4m');
+            }
+
+            if (currentStar.lcIndex % 2 >= 0) currentStar.synth.triggerAttackRelease(note, '12n');
+        } else if (currentStar.type == 'conga') {
+            //triggered at different notes
+            if (t % currentStar.vel == 0) {
+                currentStar.synth.triggerAttackRelease(note, '48n');
+            }
+        } else if (currentStar.type == 'kick') {
+            //triggered at different notes
+            if ((t + 4) % currentStar.vel == 0) {
+                currentStar.synth.triggerAttack(note, '48n');
+            }
         }
-        else if (xhr.status !== 200) {
-            alert('Request failed.  Returned status of ' + xhr.status);
-        }
-    };
-    xhr.send();
-})
-
-//aladin.addCatalog(A.catalogFromVizieR('I/345/gaia2', '12.5116686 -17.607493', 0.01, {onClick: 'showTable', color: 'red'}));
-aladin.addCatalog(A.catalogFromURL('http://cds.unistra.fr/~boch/adass2018-hackathon/gaia-variable-sample.vot', { color: 'red', onClick: 'showTable' }));
-
+    }
+    //triggered every 48th mesure.
+    //console.log(Tone.Transport.position);
+    t = t + 1;
+}, "12n").start(0);
+Tone.Transport.start();
 
