@@ -158,17 +158,17 @@ aladin.on('objectClicked', function (object) {
                 var phase_2P = data.phase.concat(data.phase.map(function (x) { return 1 + x; }));
 
                 var synth;
-		var vel; 
+                var vel;
                 if (globalInstId == 1) {
-		    synth = new Tone.MembraneSynth({
-			"pitchDecay" : 0.008,
-			"octaves" : 2,
-			"envelope" : {
-				"attack" : 0.01,
-				"decay" : 0.5,
-				"sustain" : 0
-			}
-		    });
+                    synth = new Tone.MembraneSynth({
+                        "pitchDecay": 0.008,
+                        "octaves": 2,
+                        "envelope": {
+                            "attack": 0.01,
+                            "decay": 0.5,
+                            "sustain": 0
+                        }
+                    });
                     // Connect lowpass filter to the kick
                     synth.connect(new Tone.Filter(500));
                     var freeverb = new Tone.Freeverb().toMaster();
@@ -205,26 +205,26 @@ aladin.on('objectClicked', function (object) {
                         }
                     }).toMaster();
                     vel = velocities[Math.floor(Math.random() * velocities.length)];
-		} else if(globalInstId == 2) {
-			synth = new Tone.MembraneSynth({
-				"volume": "+10",
-				"pitchDecay" : 0.008,
-				"octaves" : 2,
-				"envelope" : {
-					"attack" : 0.01,
-					"decay" : 1,
-					"sustain" : 0,
-				}
-		    	});
-                    	// Connect lowpass filter to the kick
+                } else if (globalInstId == 2) {
+                    synth = new Tone.MembraneSynth({
+                        "volume": "+10",
+                        "pitchDecay": 0.008,
+                        "octaves": 2,
+                        "envelope": {
+                            "attack": 0.01,
+                            "decay": 1,
+                            "sustain": 0,
+                        }
+                    });
+                    // Connect lowpass filter to the kick
 
-                    	vel = 12;
+                    vel = 12;
                     // Connect lowpass filter to the kick
                     var freeverb = new Tone.Freeverb().toMaster();
                     freeverb.dampening.value = 100;
                     synth.connect(freeverb);
                     synth.toMaster();
-		}
+                }
 
                 var newStar = {
                     params: {
@@ -255,7 +255,7 @@ aladin.on('objectClicked', function (object) {
                 var liElt = document.createElement('li');
                 var color = colors[globalInstId];
                 var sourceName = object.data.EROS2 !== undefined ? 'EROS2 ' + object.data.EROS2 : 'Gaia DR2 ' + object.data.source_id;
-                    liElt.innerHTML = "<p style='color: " + color + ";display: inline-block;margin: 0'>" + typeOfInsts[globalInstId] + "</>" + ' for source: ' + sourceName;
+                liElt.innerHTML = "<p style='color: " + color + ";display: inline-block;margin: 0'>" + typeOfInsts[globalInstId] + "</>" + ' for source: ' + sourceName;
 
                 ulElt.appendChild(liElt);
 
@@ -312,6 +312,10 @@ var starDrawFunction = function (source, canvasCtx, viewParams) {
     else {
 
         canvasCtx.drawImage(getShape(diam, 230, 20, 20, 0.7), source.x - diam / 2., source.y - diam / 2.);
+        if (source.data.source_id==4064062436812840320 || source.data.source_id==4066644914710375680 || source.data.source_id==4061197143876548736) {
+            diam + 4;
+            canvasCtx.drawImage(getShape(diam, 255, 255, 255, 1.0), source.x - diam / 2., source.y - diam / 2.);
+        }
     }
 };
 
